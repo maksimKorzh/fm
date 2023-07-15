@@ -8,14 +8,30 @@ import "github.com/nsf/termbox-go"
 import "github.com/mattn/go-runewidth"
 
 var COLS, ROWS int
-var left = 0
-var right = 1
-var left_row_offset, right_row_offset, active_panel int
-var left_current_row, right_current_row int
-var left_panel = []map[string]interface{}{}
-var right_panel = []map[string]interface{}{}
-var left_path = "/home/cmk"
-var right_path = "/bin"
+var LEFT = 0
+var RIGHT = 1
+var active_panel = LEFT
+
+type Panel struct {
+  path string
+  panel []map[string]interface{}
+  current_row, row_offset int
+}
+
+var panels = []Panel {
+  {
+    path: "/home/cmk",
+    panel: []map[string]interface{}{},
+    current_row: 0,
+    row_offset: 0,
+  },
+  {
+    path: "/bin",
+    panel: []map[string]interface{}{},
+    current_row: 0,
+    row_offset: 0,
+  },
+}
 
 func display_cell(lt, rt, lb, rb [] int) {
   for row := lt[1]+1; row < lb[1]; row++ {
@@ -44,11 +60,12 @@ func display_panels() {
 }
 
 
-func load_panel(path string, active int) {
-  dir, err := os.Open(path);
+func load_panel(active int) {
+  dir, err := os.Open(panels[active].path);
   panel, err := dir.Readdir(-1);
   defer dir.Close(); if err != nil { return }
   load_panel := []map[string]interface{}{}
+  load_panel = append(load_panel, map[string]interface{}{"name": ".."})
   for row := 0; row < len(panel); row++ {
     info := map[string]interface{}{
       "name": panel[row].Name(),
@@ -58,71 +75,53 @@ func load_panel(path string, active int) {
       "exec": panel[row].Mode().Perm()&0111,
       "inserted": false,
     }; load_panel = append(load_panel, info)
-  }
-  if active == left { left_panel = load_panel
-  } else { right_panel = load_panel }
+  };panels[active].panel = load_panel
 }
 
 func display_panel(offset, active int) {
   var panel = []map[string]interface{}{}
   row_offset := 0; current_row := 0
   col_from := 0; col_to := 0
-  if active == left {
-    panel = left_panel
-    row_offset = left_row_offset
-    current_row = left_current_row
-  } else {
-    panel = right_panel
-    row_offset = right_row_offset
-    current_row = right_current_row
-  }
-
-
-
+  panel = panels[active].panel
+  row_offset = panels[active].row_offset
+  current_row = panels[active].current_row
   if current_row < row_offset { row_offset = current_row }
   if current_row >= row_offset + ROWS-2 { row_offset = current_row - ROWS+2+1 }
-  if active == left { left_row_offset = row_offset
-  } else { right_row_offset = row_offset }
-
+  panels[active].row_offset = row_offset
   for row := 0; row < ROWS-2; row++ {
     buffer_row := row + row_offset
     if buffer_row < len(panel) {
-      if row < ROWS-3 {
-        if active == left {
-          print_message(1, row+2, termbox.ColorWhite, termbox.ColorBlue, panel[buffer_row]["name"].(string))
+      if row < ROWS-2 {
+        if active == LEFT {
+          print_message(1, row+1, termbox.ColorWhite, termbox.ColorBlue, panel[buffer_row]["name"].(string))
         } else {
-          print_message(1+offset, row+2, termbox.ColorWhite, termbox.ColorBlue, panel[buffer_row]["name"].(string))
+          print_message(1+offset, row+1, termbox.ColorWhite, termbox.ColorBlue, panel[buffer_row]["name"].(string))
         }
       }
     }
-
-
     if row == current_row - row_offset && active_panel == active {
       _, ROWS := termbox.Size();
       if row >= ROWS { continue }
-      if active_panel == left { col_from = 1; col_to = int(COLS/2)-1
+      if active_panel == LEFT { col_from = 1; col_to = int(COLS/2)-1
       } else { col_from = int(COLS/2)+1; col_to = COLS-1 }
       for col := col_from; col < col_to; col++ {
         current_cell := termbox.GetCell(col, row+1)
         termbox.SetCell(col, row+1, current_cell.Ch, termbox.ColorDefault, termbox.ColorYellow)
       }
     }
-
   }
-
-
 }
 
 func display_files() {
-  display_panel(0, left)
-  display_panel(int(COLS/2)+1, right)
+  display_panel(0, LEFT)
+  display_panel(int(COLS/2)+1, RIGHT)
 }
 
 func print_message(x, y int, fg, bg termbox.Attribute, message string) {
   for _, c := range message {
     termbox.SetCell(x, y, c, fg, bg)
     x += runewidth.RuneWidth(c)
-  }//;termbox.Flush()
+  }
 }
 
 func get_event() termbox.Event {
@@ -135,26 +134,25 @@ func get_event() termbox.Event {
 
 func process_keypress() {
   event := get_event()
+  current_row := &panels[active_panel].current_row
+  current_panel := &panels[active_panel].panel
   switch event.Key {
     case termbox.KeyEsc: termbox.Close(); os.Exit(0)
-    case termbox.KeyArrowDown:
-      if active_panel == 0 {
-        if left_current_row < len(left_panel) { left_current_row++ }
-      } else { if right_current_row < len(right_panel) { right_current_row++ }}
-    case termbox.KeyArrowUp:
-      if active_panel == 0 {
-        if left_current_row > 0 { left_current_row-- }
-      } else { if right_current_row > 0 { right_current_row-- }}
-    case termbox.KeyArrowRight: active_panel = right
-    case termbox.KeyArrowLeft: active_panel = left
+    case termbox.KeyArrowDown: if *current_row < len(*current_panel)-1 { *current_row++ }
+    case termbox.KeyArrowUp: if *current_row > 0 { *current_row-- }
+    case termbox.KeyArrowRight: active_panel = RIGHT
+    case termbox.KeyArrowLeft: active_panel = LEFT
+    case termbox.KeyEnter: {
+
+    }
   }
 }
 
 func run_file_manager() {
   err := termbox.Init()
   if err != nil { fmt.Println(err); os.Exit(1) }
-  load_panel(left_path, left)
-  load_panel(right_path, right)
+  load_panel(LEFT)
+  load_panel(RIGHT)
   for {
     COLS, ROWS = termbox.Size()
     termbox.Clear(termbox.ColorWhite, termbox.ColorBlue)
