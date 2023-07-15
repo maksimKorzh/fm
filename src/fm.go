@@ -3,6 +3,7 @@ package main
 import (
   "os"
   "fmt"
+  "sort"
   "runtime"
   "strings"
   "strconv"
@@ -23,13 +24,13 @@ type Panel struct {
 
 var panels = []Panel {
   {
-    path: "/home/cmk/Desktop",
+    path: "/",
     panel: []map[string]interface{}{},
     current_row: 0,
     row_offset: 0,
   },
   {
-    path: "/bin",
+    path: "/",
     panel: []map[string]interface{}{},
     current_row: 0,
     row_offset: 0,
@@ -62,10 +63,11 @@ func display_panels() {
   display_cell(rlt, rrt, rlb, rrb)
 }
 
-
 func load_panel(active int) {
   dir, err := os.Open(panels[active].path);
   panel, err := dir.Readdir(-1);
+  sort.Slice(panel, func(i, j int) bool { return panel[i].Name()[0] != '.' })
+  sort.Slice(panel, func(i, j int) bool { return panel[i].IsDir() })
   defer dir.Close(); if err != nil { return }
   load_panel := []map[string]interface{}{}
   load_panel = append(load_panel, map[string]interface{}{"name": "..", "dir": true})
@@ -162,6 +164,7 @@ func process_keypress() {
         if panels[active_panel].path == "" { panels[active_panel].path = "/"}
         load_panel(active_panel)
       } else if current_panel[*current_row]["dir"] == true {
+        if panels[active_panel].path == "/" { split_ch = "" }
         panels[active_panel].path += split_ch + current_panel[*current_row]["name"].(string)
         load_panel(active_panel); *current_row = 0
       }
