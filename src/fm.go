@@ -196,9 +196,11 @@ func process_keypress() {
     case termbox.KeyArrowLeft: active_panel = LEFT
     case termbox.KeyEnter: {
       if current_panel[*current_row]["name"] == ".." {
+        if runtime.GOOS == "windows" && len(panels[active_panel].path) <= 3 { break }
         split_path := strings.Split(panels[active_panel].path, split_ch)
         panels[active_panel].path = strings.Join(split_path[:len(split_path)-1], split_ch)
         if panels[active_panel].path == "" { panels[active_panel].path = split_ch}
+        if len(panels[active_panel].path) == 2 { panels[active_panel].path += "\\"; }
         load_panel(active_panel)
       } else if current_panel[*current_row]["dir"] == true {
         is_root := split_ch
