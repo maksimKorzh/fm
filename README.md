@@ -1,7 +1,5 @@
 # FM
 A bare bones cross-platform terminal based file manager written in Go
-
-# Screenshot
 ![IMAGE ALT TEXT HERE](https://raw.githubusercontent.com/maksimKorzh/fm/main/assets/fm.png)
 
 # Features
