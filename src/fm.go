@@ -12,6 +12,8 @@ import (
   "github.com/mattn/go-runewidth"
 )
 
+var DRIVES = ""
+var drive = 0
 var COLS, ROWS int
 var LEFT = 0
 var RIGHT = 1
@@ -144,25 +146,6 @@ func display_panel(offset, active int) {
   }
 }
 
-func display_files() {
-  display_panel(0, LEFT)
-  display_panel(int(COLS/2)+1, RIGHT)
-}
-
-func print_message(x, y int, fg, bg termbox.Attribute, message string) {
-  for _, c := range message {
-    termbox.SetCell(x, y, c, fg, bg)
-    x += runewidth.RuneWidth(c)
-  }
-}
-
-func get_event() termbox.Event {
-  var event termbox.Event
-  switch poll_event := termbox.PollEvent(); event.Type {
-    case termbox.EventKey: event = poll_event
-    case termbox.EventError: panic(event.Err)
-  }; return event
-}
 
 func execute_command() { ROWS--
   termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
@@ -252,12 +235,54 @@ func process_keypress() {
           err := cmd.Run(); if err != nil { break }
           load_panel(LEFT); load_panel(RIGHT)
         }
-      }; *current_row = 0
+      }; panels[LEFT].current_row = 0; panels[RIGHT].current_row = 0
     }
     case termbox.KeyEnd: { execute_command() }
-    case termbox.KeyPgup: *current_row = 0
-    case termbox.KeyPgdn: *current_row = len(current_panel)-1
+    case termbox.KeyPgup: {
+      if runtime.GOOS == "windows" {
+        if drive > 0 { drive-- }
+        panels[active_panel].path = string(DRIVES[drive]) + ":\\"
+        load_panel(active_panel)
+      }
+    }
+    case termbox.KeyPgdn: {
+      if runtime.GOOS == "windows" {
+        if drive < len(DRIVES)-1 { drive++ }
+        panels[active_panel].path = string(DRIVES[drive]) + ":\\"
+        load_panel(active_panel)
+      }
+    }
   }
+}
+
+func get_event() termbox.Event {
+  var event termbox.Event
+  switch poll_event := termbox.PollEvent(); event.Type {
+    case termbox.EventKey: event = poll_event
+    case termbox.EventError: panic(event.Err)
+  }; return event
+}
+
+func display_files() {
+  display_panel(0, LEFT)
+  display_panel(int(COLS/2)+1, RIGHT)
+}
+
+func print_message(x, y int, fg, bg termbox.Attribute, message string) {
+  for _, c := range message {
+    termbox.SetCell(x, y, c, fg, bg)
+    x += runewidth.RuneWidth(c)
+  }
+}
+
+func get_drives() () {
+  for _, drive := range "ABCDEFGHIJKLMNOPQRSTUVWXYZ"{
+    f, err := os.Open(string(drive)+":\\")
+    if err == nil {
+      DRIVES += string(drive)
+      f.Close()
+    }
+  };return
 }
 
 func run_file_manager() {
@@ -268,7 +293,10 @@ func run_file_manager() {
   if err != nil { termbox.Close(); fmt.Println("Error reading CWD"); os.Exit(1) }
   load_panel(LEFT)
   load_panel(RIGHT)
-  if runtime.GOOS == "windows" { split_ch = "\\" }
+  if runtime.GOOS == "windows" {
+    split_ch = "\\"
+    get_drives()
+  }
   for {
     COLS, ROWS = termbox.Size()
     if COLS < 78 { COLS = 78 }
