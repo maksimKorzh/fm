@@ -112,7 +112,7 @@ func display_panel(offset, active int) {
         fgcolor := termbox.ColorWhite;
         if panel[buffer_row]["dir"] == true { fgcolor = termbox.ColorYellow | termbox.AttrBold
         } else if panel[buffer_row]["exec"] == true { fgcolor = termbox.ColorGreen | termbox.AttrBold
-        };if panel[buffer_row]["inserted"] == 1 { fgcolor = termbox.ColorMagenta | termbox.AttrBold }
+        };if panel[buffer_row]["inserted"] == 1 { fgcolor = termbox.ColorRed | termbox.AttrBold }
         overflow := ""; limit := len(panel[buffer_row]["name"].(string));
         if limit > 12 { limit = 12; overflow = "~" }
         name := panel[buffer_row]["name"].(string); size := ""
@@ -180,7 +180,7 @@ func execute_command() { ROWS--
       case termbox.KeyEnter:
         if len(dir_name) > 0 {
           cmd := exec.Command("mkdir", panels[active_panel].path + split_ch + dir_name)
-          err := cmd.Run(); if err != nil { return }
+          err := cmd.Run(); if err != nil { termbox.SetCursor(-1,-1); return }
           load_panel(LEFT); load_panel(RIGHT)
         };break dir_name_loop
       case termbox.KeySpace: dir_name += " "
@@ -255,6 +255,8 @@ func process_keypress() {
       }; *current_row = 0
     }
     case termbox.KeyEnd: { execute_command() }
+    case termbox.KeyPgup: *current_row = 0
+    case termbox.KeyPgdn: *current_row = len(current_panel)-1
   }
 }
 
@@ -269,6 +271,7 @@ func run_file_manager() {
   if runtime.GOOS == "windows" { split_ch = "\\" }
   for {
     COLS, ROWS = termbox.Size()
+    if COLS < 78 { COLS = 78 }
     termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
     display_borders()
     display_files()
